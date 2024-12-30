@@ -1,51 +1,48 @@
 import requests
 import json
 
-def emotion_detector(text_to_analyse):
+from typing import Dict, Optional
+
+def emotion_detector(text_to_analyze: str) -> Optional[Dict[str, float]]:
     """
     Analyzes the given text to detect emotions and returns the intensity of 
     each emotion along with the dominant emotion.
 
     Parameters:
-    text_to_analyse (str): The text to be analyzed for emotions.
+    text_to_analyze (str): The text to be analyzed for emotions.
 
     Returns:
     dict: A dictionary containing the intensity of emotions ('anger', 
-    'disgust', 'fear', 'joy', 'sadness') and the 'dominant_emotion'.
+    'disgust', 'fear', 'joy', 'sadness') and the 'dominant_emotion'. 
     """
-
-    # Define the URL for the sentiment analysis API
-    url = 'https://sn-watson-emotion.labs.skills.network/v1/watson.runtime.nlp.v1/NlpService/EmotionPredict'
-
-    # Create the payload with the text to be analyzed
-    myobj = { "raw_document": { "text": text_to_analyse } }
-
-    # Set the headers with the required model ID for the API
-    header = {"grpc-metadata-mm-model-id": "emotion_aggregated-workflow_lang_en_stock"}
+    api_url = 'https://sn-watson-emotion.labs.skills.network/v1/watson.runtime.nlp.v1/NlpService/EmotionPredict'
+    payload = {"raw_document": {"text": text_to_analyze}}
+    headers = {
+        "grpc-metadata-mm-model-id": "emotion_aggregated-workflow_lang_en_stock"
+    }
     
-    # Make a POST request to the API with the payload and headers
-    response = requests.post(url, json=myobj, headers=header)
+    if not text_to_analyze:
+        return {emotion: None for emotion in ['anger', 'disgust', 'fear', 'joy', 'sadness', 'dominant_emotion']}
 
-    # Parse the response from the API
-    formatted_response = json.loads(response.text)
+    response = requests.post(api_url, json=payload, headers=headers)
 
-    emotion=formatted_response['emotionPredictions'][0]['emotion']
+    if response.status_code == 400:
+        return {emotion: None for emotion in ['anger', 'disgust', 'fear', 'joy', 'sadness', 'dominant_emotion']}
 
-    anger = formatted_response['emotionPredictions'][0]['emotion']['anger']
-    disgust = formatted_response['emotionPredictions'][0]['emotion']['disgust']
-    fear = formatted_response['emotionPredictions'][0]['emotion']['fear']
-    joy = formatted_response['emotionPredictions'][0]['emotion']['joy']
-    sadness = formatted_response['emotionPredictions'][0]['emotion']['sadness']
+    if response.status_code != 200:
+        raise Exception("Failed to get a valid response from the emotion detection API.")
     
-    # Get which emotion is dominant and return the name of the emotion
-    dominant_emotion = max(emotion, key=emotion.get)
     
-    # return response
+    response_data = response.json()
+    emotion_data = response_data['emotionPredictions'][0]['emotion']
+
+    dominant_emotion = max(emotion_data, key=emotion_data.get)
+
     return {
-            'anger': anger,
-            'disgust': disgust,
-            'fear': fear,
-            'joy': joy,
-            'sadness': sadness,
-            'dominant_emotion': dominant_emotion
-        }
+        'anger': emotion_data['anger'],
+        'disgust': emotion_data['disgust'],
+        'fear': emotion_data['fear'],
+        'joy': emotion_data['joy'],
+        'sadness': emotion_data['sadness'],
+        'dominant_emotion': dominant_emotion
+    }
